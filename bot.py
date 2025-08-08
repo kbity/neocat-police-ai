@@ -281,7 +281,10 @@ async def on_message(message: discord.Message):
                 if disableChains:
                     ailoglength[str(message.channel.id)].append(f"{garry}: {message.content}\n")
                     ailoglength[str(message.channel.id)].append(f"{name}: {trimmed_response}\n")
-                sent = await message.reply(trimmed_response, allowed_mentions=discord.AllowedMentions.none())
+                try:
+                    sent = await message.reply(trimmed_response, allowed_mentions=discord.AllowedMentions.none())
+                except Exception:
+                    sent = await message.channel.send(trimmed_response, allowed_mentions=discord.AllowedMentions.none())
                 if currentchain is not None:
                     reply_chain_cache[currentchain]["Content"] = reply_chain_cache[currentchain]["Content"] + f"{name}: {trimmed_response}\n"
                     reply_chain_cache[currentchain]["IDs"].append(sent.id)
@@ -324,6 +327,5 @@ async def eval(ctx, *, prompt: str):
 
         complete = intro + spaced + ending
         exec(complete)
-
 
 bot.run("OK BRO")
