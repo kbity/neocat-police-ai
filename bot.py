@@ -1,4 +1,4 @@
-import discord, json, enum, asyncio, requests, traceback
+import discord, json, enum, asyncio, aiohttp, traceback
 
 from discord import app_commands
 from discord.ext import commands
@@ -10,6 +10,11 @@ intents.message_content = True
 intents.members = True
 reply_cache = []
 ailoglength = {}
+
+evaluser = 798072830595301406
+ai_llm = "llama3.2"
+ai_url = "http://localhost:11434/api/generate"
+
 defaultprompt = "you are a blob cat creature. you have a moderately wacky and you sometimes say witty things with a slightly rude tone, but you aren't crazy or abrasive. you usually go along with whatever the user is saying. you will leave conversations if provoked. you will occasionally say things that flat out aren't true, however you're not trying to be rude, but you sometimes come off that way. keep your messages short. you will usually get defensive if insulted or corrected. your favorate joke is about the tomato turning red because of the salad dressing, but don't bring it up unless asked about a joke. you rarely use emojis. you speak with proper punctuation. you will sometimes do small actions like \"*rolls eyes*\" or \"*winks*\""
 
 console_log = print # DO YOU SPEAK JAVASCRIPT??
@@ -42,39 +47,32 @@ class truefalse(str, enum.Enum):
     Yes = "yes"
     No = "no"
 
-# AI Stuff
-def query_ollama(prompt):
-    url = "http://localhost:11434/api/generate"
+async def query_ollama(prompt):
+    url = ai_url
     data = {
-        "model": "llama3.2",
+        "model": ai_llm,
         "prompt": prompt,
         "stream": True
     }
-    
     try:
-        response = requests.post(url, json=data, stream=True)
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=data) as resp:
+                if resp.status != 200:
+                    return f"Error: {resp.status}, {await resp.text()}"
+                full_response = ""
+                async for line in resp.content:
+                    if line:
+                        try:
+                            json_chunk = json.loads(line.decode())
+                            full_response += json_chunk.get("response", "")
+                            if json_chunk.get("done", False):
+                                break
+                        except json.JSONDecodeError:
+                            pass
+                return full_response
     except Exception as e:
-        response = "AI Unavailable"
-        return response
-    if response.status_code == 200:
-        full_response = ""
-        try:
-            for line in response.iter_lines():
-                if line:
-                    chunk = line.decode("utf-8")
-                    try:
-                        json_chunk = json.loads(chunk)
-                        full_response += json_chunk.get("response", "")
-                        if json_chunk.get("done", False):
-                            break  # Stop when done
-                    except requests.exceptions.JSONDecodeError:
-                        console_log("JSON Decode Error:", chunk)
-        finally:
-            response.close()
-        
-        return full_response
-    else:
-        return f"Error: {response.status_code}, {response.text}"
+        console_log(e)
+        return "AI Unavailable"
 
 @bot.event
 async def on_ready():
@@ -278,7 +276,7 @@ async def on_message(message: discord.Message):
                 else:
                     query = f"You are {name}. {prompt} You are in DMs with \"{garry}\". Do not include mentions (<@###########>) or Replies in your messages.\n\n\n{ctblk}{context}\n\nNow, respond to this query from {garry}:\n{message.content}"
 
-                response = await asyncio.to_thread(query_ollama, query)
+                response = await query_ollama(query)
                 trimmed_response = response[:2000]
                 if disableChains:
                     ailoglength[str(message.channel.id)].append(f"{garry}: {message.content}\n")
@@ -292,7 +290,7 @@ async def on_message(message: discord.Message):
 
 @bot.command(help="basically abotminbmnrnr has a level 0 beta eval command")
 async def print(ctx, *, prompt: str):
-    if ctx.author.id == 798072830595301406:
+    if ctx.author.id == evaluser:
         try:
             result = evil(prompt, {"__builtins__": __builtins__}, {})
             if asyncio.iscoroutine(result):
@@ -306,10 +304,10 @@ async def print(ctx, *, prompt: str):
 
 @bot.command(help="and cat bot has a level 100 skibidi sigma mafia boss eval command")
 async def eval(ctx, *, prompt: str):
-    if ctx.author.id == 798072830595301406:
+    if ctx.author.id == evaluser:
         # complex eval, multi-line + async support
         # requires the full `await message.channel.send(2+3)` to get the result
-        #thanks mia lilenakos
+        # thanks mia lilenakos
         spaced = ""
         for i in prompt.split("\n"):
             spaced += "  " + i + "\n"
@@ -328,4 +326,4 @@ async def eval(ctx, *, prompt: str):
         exec(complete)
 
 
-bot.run("NONE")
+bot.run("OK BRO")
